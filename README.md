@@ -91,3 +91,8 @@ Výsledek nad vzorovými daty:
 
 SPŠ Havířov ve výsledku není, protože jí licence končí až za 200 dní. Gymnázium má v datech i starý počítač na verzi 1.6.0, ale ten je vyřazený, takže se nepočítá. Dluh ZŠ Lipová 1 800 Kč je faktura, kterou škola zaplatila se špatným VS: v tabulce `pohyby` leží nespárovaný pohyb na stejnou částku. Pro jiné období změňte hodnotu `dni` v CTE `obdobi`.
 
+## 6. Spuštění v PostgreSQL
+ 
+1. V dbdiagram.io zkopírujte obsah `licence.dbml` do levého editoru. Diagram se vykreslí automaticky.
+2. Spusťte nejprve `licence.sql` a potom `licence.seed.sql` jako uživatel s oprávněním vytvořit schéma a tabulky. Pro ukázkový dotaz spusťte `vzorovy_select.sql`.
+3. Skript `licence.sql` na začátku odstraní celé schéma příkazem `DROP SCHEMA IF EXISTS licence CASCADE;` a vytvoří ho znovu, proto jej lze spouštět opakovaně. Pozor: při každém spuštění se smažou všechny tabulky a data ve schématu `licence`.
