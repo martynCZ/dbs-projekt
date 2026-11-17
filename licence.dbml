@@ -1,0 +1,133 @@
+//// Docs: https://dbml.dbdiagram.io/docs
+//// Evidence licencí a plateb softwaru pro školy
+
+Project licence {
+  database_type: 'PostgreSQL'
+  Note: 'Model pro evidenci škol, licencí, aktivovaných počítačů, verzí programu, požadavků, předpisů plateb, faktur a plateb z banky.'
+}
+
+Table licence.zakaznici {
+  zakaznik_id integer [pk, increment]
+  nazev varchar(200) [not null]
+  ico char(8) [unique]
+  adresa varchar(200)
+  email varchar(150) [not null, note: 'kam chodí licenční kódy a faktury']
+  kontakt varchar(100) [note: 'kontaktní osoba']
+  telefon varchar(20)
+  stav varchar(10) [not null, default: 'zajemce', note: 'zajemce | zkousi | plati | odesla']
+  ozvat_se date [note: 'připomínka, kdy škole zavolat']
+  vytvoreno timestamptz [not null, default: `now()`]
+}
+
+Table licence.licence {
+  licence_id integer [pk, increment]
+  zakaznik_id integer [not null, ref: > licence.zakaznici.zakaznik_id]
+  kod char(19) [not null, unique, note: 'RSTR-XXXX-XXXX-XXXX']
+  popisek varchar(100) [note: 'označení instalace']
+  edice varchar(10) [not null, default: 'pro', note: 'pro | basic | trial']
+  max_stanic integer [not null, default: 30]
+  plati_do date [not null]
+  zruseno boolean [not null, default: false]
+  archivovano timestamptz [note: 'NULL = v provozu']
+  vytvoreno timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (zakaznik_id, plati_do)
+  }
+  Note: 'Licence = jedna instalace programu'
+}
+
+Table licence.verze_programu {
+  verze varchar(11) [pk, note: 'např. 1.7.8']
+  odkaz varchar(500) [not null]
+  poznamky text
+  vydano timestamptz [not null, default: `now()`]
+}
+
+Table licence.aktivace {
+  aktivace_id integer [pk, increment]
+  licence_id integer [not null, ref: > licence.licence.licence_id]
+  machine_id char(32) [not null, note: 'otisk počítače']
+  poradi integer [not null]
+  prvni_vydani timestamptz [not null, default: `now()`]
+  posledni timestamptz [not null, default: `now()`]
+  vyrazeno timestamptz [note: 'počítač byl vyměněn nebo odebrán']
+  hlaseno timestamptz
+  verze_konzole varchar(11) [ref: > licence.verze_programu.verze, note: 'NULL = program nehlásí']
+  hlasenych_stanic integer
+
+  Indexes {
+    (licence_id, machine_id) [unique]
+  }
+  Note: 'Počítač, na kterém je licence aktivovaná'
+}
+
+Table licence.zakaznik_zaznamy {
+  zaznam_id integer [pk, increment]
+  zakaznik_id integer [not null, ref: > licence.zakaznici.zakaznik_id]
+  kdy timestamptz [not null, default: `now()`]
+  druh varchar(10) [not null, default: 'poznamka', note: 'poznamka | pozadavek']
+  text text [not null]
+  vyreseno timestamptz [note: 'jen u požadavku']
+
+  Indexes {
+    zakaznik_id
+  }
+}
+
+Table licence.faktury {
+  faktura_id integer [pk, increment]
+  cislo char(8) [not null, unique, note: 'zároveň variabilní symbol']
+  zakaznik_id integer [ref: > licence.zakaznici.zakaznik_id, note: 'ON DELETE SET NULL']
+  odb_nazev varchar(200) [not null, note: 'kopie odběratele k datu vystavení']
+  odb_ico char(8)
+  popis varchar(200) [not null]
+  vystaveno date [not null]
+  splatnost date [not null]
+  celkem integer [not null, note: 'celé Kč, neplátce DPH']
+  stav varchar(10) [not null, default: 'vystavena', note: 'vystavena | zaplacena | stornovana']
+  zaplaceno date
+  stornovano timestamptz
+
+  Indexes {
+    zakaznik_id
+  }
+}
+
+Table licence.platby {
+  platba_id integer [pk, increment]
+  licence_id integer [not null, ref: > licence.licence.licence_id]
+  faktura_id integer [ref: > licence.faktury.faktura_id, note: 'NULL = ještě nevyfakturováno']
+  vznik timestamptz [not null, default: `now()`]
+  duvod varchar(12) [not null, default: 'rucne', note: 'zalozeni | prodlouzeni | rucne']
+  plati_do date [note: 'do kdy platba licenci prodlužuje']
+  castka integer [not null]
+  stav varchar(12) [not null, default: 'ceka', note: 'ceka | zaplaceno | neuctuje_se']
+  zaplaceno date
+
+  Indexes {
+    licence_id
+    faktura_id
+  }
+  Note: 'Předpis platby za licenci a období; vazební tabulka mezi licencemi a fakturami'
+}
+
+Table licence.pohyby {
+  pohyb_id bigint [pk, note: 'ID pohybu z banky']
+  stazeno timestamptz [not null, default: `now()`]
+  datum date [not null]
+  castka numeric(12,2) [not null]
+  vs varchar(10) [note: 'VS, jak přišel z banky']
+  protiucet varchar(40)
+  kod_banky varchar(4)
+  nazev_protiuctu varchar(120)
+  stav varchar(10) [not null, default: 'nove', note: 'nove | sparovano | nepatri']
+  faktura_id integer [ref: > licence.faktury.faktura_id, note: 'NULL = nespárováno']
+  sparovano timestamptz
+  samo boolean [note: 'spárováno automaticky podle VS']
+
+  Indexes {
+    faktura_id
+  }
+  Note: 'Příchozí transakce stažené z bankovního API'
+}
